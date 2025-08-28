@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>울산 숨겨진 맛집</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .map-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        #map {
+            height: 500px;
+            width: 100%;
+            border-radius: 10px;
+            border: 3px solid #f0f0f0;
+        }
+
+        .restaurant-info {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: none;
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .restaurant-card {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .restaurant-image {
+            width: 300px;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .restaurant-details h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.8rem;
+        }
+
+        .restaurant-details p {
+            color: #666;
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+
+        .rating {
+            color: #ff6b6b;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .specialty {
+            background: linear-gradient(45deg, #ff9a56, #ff6b6b);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        .custom-popup {
+            text-align: center;
+        }
+
+        .popup-image {
+            width: 200px;
+            height: 130px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .popup-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .popup-desc {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .restaurant-card {
+                flex-direction: column;
+            }
+            
+            .restaurant-image {
+                width: 100%;
+                max-width: 300px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍜 울산 숨겨진 맛집</h1>
+            <p>현지인만 아는 진짜 맛집을 찾아보세요</p>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+
+        <div class="restaurant-info" id="restaurantInfo">
+            <div class="restaurant-card">
+                <img src="https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=300&h=200&fit=crop" 
+                     alt="전통 한식당" class="restaurant-image" id="restaurantImage">
+                <div class="restaurant-details">
+                    <h2 id="restaurantName">할매손칼국수</h2>
+                    <p><strong>📍 주소:</strong> <span id="restaurantAddress">울산광역시 중구 성안동 123-45</span></p>
+                    <p><strong>📞 전화:</strong> <span id="restaurantPhone">052-123-4567</span></p>
+                    <p><strong>🕐 영업시간:</strong> <span id="restaurantHours">오전 10:00 - 오후 9:00 (일요일 휴무)</span></p>
+                    <p><strong>⭐ 평점:</strong> <span class="rating" id="restaurantRating">4.8/5.0</span></p>
+                    <p id="restaurantDescription">40년 전통의 손칼국수 맛집입니다. 매일 새벽에 우린 진한 사골국물과 손으로 직접 뽑은 면발이 일품입니다.</p>
+                    <div class="specialty" id="restaurantSpecialty">손칼국수 • 만두</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script>
+        // 울산 중심 좌표
+        const ulsanCenter = [35.5384, 129.3114];
+        
+        // 지도 초기화
+        const map = L.map('map').setView(ulsanCenter, 13);
+        
+        // OpenStreetMap 타일 레이어 추가
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+
+        // 맛집 데이터
+        const restaurants = [
+            {
+                name: "할매손칼국수",
+                coords: [35.5456, 129.3167],
+                address: "울산광역시 중구 성안동 123-45",
+                phone: "052-123-4567",
+                hours: "오전 10:00 - 오후 9:00 (일요일 휴무)",
+                rating: "4.8/5.0",
+                description: "40년 전통의 손칼국수 맛집입니다. 매일 새벽에 우린 진한 사골국물과 손으로 직접 뽑은 면발이 일품입니다.",
+                specialty: "손칼국수 • 만두",
+                image: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=300&h=200&fit=crop",
+                category: "한식"
+            },
+            {
+                name: "바다향 횟집",
+                coords: [35.5234, 129.3445],
+                address: "울산광역시 동구 방어동 67-89",
+                phone: "052-234-5678",
+                hours: "오후 5:00 - 오전 2:00 (월요일 휴무)",
+                rating: "4.6/5.0",
+                description: "울산 앞바다에서 직접 잡은 신선한 회를 맛볼 수 있는 숨겨진 맛집입니다. 현지 어부들도 인정하는 맛집이에요.",
+                specialty: "물회 • 광어회",
+                image: "https://images.unsplash.com/photo-1579952363873-27d3bfad9c0d?w=300&h=200&fit=crop",
+                category: "해산물"
+            },
+            {
+                name: "옛날짜장 중화루",
+                coords: [35.5567, 129.3234],
+                address: "울산광역시 북구 화봉동 45-12",
+                phone: "052-345-6789",
+                hours: "오전 11:00 - 오후 10:00 (연중무휴)",
+                rating: "4.7/5.0",
+                description: "60년 전통의 중화요리 전문점. 옛날 그대로의 맛을 고수하며, 특히 수제 면발과 특제 짜장소스가 유명합니다.",
+                specialty: "짜장면 • 탕수육",
+                image: "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=300&h=200&fit=crop",
+                category: "중식"
+            }
+        ];
+
+        // 커스텀 마커 아이콘 생성
+        const createCustomIcon = (category) => {
+            let color = '#ff6b6b';
+            if (category === '해산물') color = '#4ecdc4';
+            else if (category === '중식') color = '#45b7d1';
+            
+            return L.divIcon({
+                html: `<div style="
+                    background-color: ${color};
+                    width: 30px;
+                    height: 30px;
+                    border-radius: 50%;
+                    border: 3px solid white;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 16px;
+                    color: white;
+                    cursor: pointer;
+                ">🍜</div>`,
+                className: 'custom-marker',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+        };
+
+        // 마커와 팝업 추가
+        restaurants.forEach((restaurant, index) => {
+            const marker = L.marker(restaurant.coords, {
+                icon: createCustomIcon(restaurant.category)
+            }).addTo(map);
+
+            // 팝업 내용 생성
+            const popupContent = `
+                <div class="custom-popup">
+                    <img src="${restaurant.image}" alt="${restaurant.name}" class="popup-image">
+                    <div class="popup-title">${restaurant.name}</div>
+                    <div class="popup-desc">${restaurant.specialty}</div>
+                    <div style="margin-top: 8px; color: #ff6b6b; font-weight: bold;">⭐ ${restaurant.rating}</div>
+                </div>
+            `;
+
+            marker.bindPopup(popupContent);
+
+            // 마커 클릭 이벤트
+            marker.on('click', () => {
+                showRestaurantInfo(restaurant);
+            });
+        });
+
+        // 맛집 정보 표시 함수
+        function showRestaurantInfo(restaurant) {
+            document.getElementById('restaurantName').textContent = restaurant.name;
+            document.getElementById('restaurantAddress').textContent = restaurant.address;
+            document.getElementById('restaurantPhone').textContent = restaurant.phone;
+            document.getElementById('restaurantHours').textContent = restaurant.hours;
+            document.getElementById('restaurantRating').textContent = restaurant.rating;
+            document.getElementById('restaurantDescription').textContent = restaurant.description;
+            document.getElementById('restaurantSpecialty').textContent = restaurant.specialty;
+            document.getElementById('restaurantImage').src = restaurant.image;
+            document.getElementById('restaurantImage').alt = restaurant.name;
+
+            const infoDiv = document.getElementById('restaurantInfo');
+            infoDiv.style.display = 'block';
+            infoDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // 지도에 컨트롤 추가
+        const legend = L.control({position: 'bottomright'});
+        legend.onAdd = function (map) {
+            const div = L.DomUtil.create('div', 'info legend');
+            div.style.background = 'white';
+            div.style.padding = '10px';
+            div.style.borderRadius = '5px';
+            div.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+            div.innerHTML = `
+                <h4 style="margin: 0 0 10px 0; color: #333;">맛집 카테고리</h4>
+                <div style="margin-bottom: 5px;"><span style="color: #ff6b6b;">●</span> 한식</div>
+                <div style="margin-bottom: 5px;"><span style="color: #4ecdc4;">●</span> 해산물</div>
+                <div><span style="color: #45b7d1;">●</span> 중식</div>
+            `;
+            return div;
+        };
+        legend.addTo(map);
+
+        // 첫 번째 맛집 정보를 기본으로 표시
+        showRestaurantInfo(restaurants[0]);
+    </script>
+</body>
+</html>
